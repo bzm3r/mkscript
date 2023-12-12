@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: create_script
+Upstream-Contact: Brian Merchant <bzm3r@proton.me>
+Source: https://github.com/bzm3r/create_script
+
+# Sample paragraph, commented out:
+#
+# Files: src/*
+# Copyright: $YEAR $NAME <$CONTACT>
+# License: ...
