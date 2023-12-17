@@ -9,8 +9,14 @@ struct Interface {
 
     /// Whether the project requires CLI functionality (if so, `clap` will be
     /// added to its Cargo.toml).
-    #[arg(long)]
+    #[arg(short, long)]
     cli: bool,
+
+    /// Whether the project should be associated with a Github repo. If a repo
+    /// name is provided, the repo will be created under that name. Otherwise,
+    /// the script's name will be used as the repo's name.
+    #[arg(short, long)]
+    gh: bool,
 }
 
 const CLI: &str = r#"use clap::Parser;
@@ -105,6 +111,11 @@ fn main() -> anyhow::Result<()> {
     sh.write_file(".gitignore", format!("{original_contents}/result\n"))?;
     cmd!(sh, "git add .").run()?;
     cmd!(sh, "git commit -m \"init\"").run()?;
+
+    if args.gh {
+        let cwd = sh.current_dir();
+        cmd!(sh, "gh repo create {name} --public --push --source={cwd}").run()?;
+    };
 
     Ok(())
 }
