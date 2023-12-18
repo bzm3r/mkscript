@@ -1,6 +1,6 @@
 { lib, rustPlatform }:
 rustPlatform.buildRustPackage {
-  pname = "mkscript";
+  pname = "TEMPLATE_PLACEHOLDER";
   version = "0.1.0";
 
   src = ./.;
@@ -11,8 +11,8 @@ rustPlatform.buildRustPackage {
 
   meta = with lib; {
     description = "Helper for creating a new Rust scripting project";
-    homepage = "https://github.com/bzm3r/mkscript";
+    homepage = "https://github.com/bzm3r/TEMPLATE_PLACEHOLDER";
     license = with licenses; [ asl20 mit ];
-    mainProgram = "mkscript";
+    mainProgram = "TEMPLATE_PLACEHOLDER";
   };
 }

@@ -1,109 +1,79 @@
-use clap::Parser;
+use bpaf::{self, construct, long, positional, OptionParser, Parser};
 use xshell::{cmd, Shell};
 
-#[derive(Parser)]
-#[command(author, version, about)]
+#[derive(Debug, Clone)]
 struct Interface {
     /// New script's name.
-    name: String,
+    script_name: String,
 
     /// Whether the project requires CLI functionality (if so, `clap` will be
     /// added to its Cargo.toml).
-    #[arg(short, long)]
     cli: bool,
 
     /// Whether the project should be associated with a Github repo. If a repo
     /// name is provided, the repo will be created under that name. Otherwise,
     /// the script's name will be used as the repo's name.
-    #[arg(short, long)]
     gh: bool,
 }
 
-const CLI: &str = r#"use clap::Parser;
-#[derive(Parser)]
-#[command(author, version, about)]
-struct Interface {
-    /// A string value
-    name: String,
-}"#;
+fn opts() -> OptionParser<Interface> {
+    let script_name = positional("SCRIPT_NAME").help("Name of the new script to be created.");
+    let cli = long("cli")
+        .help("Additionally import CLI creation crate (`bpaf`).")
+        .switch();
+    let gh = long("gh")
+        .help("Set up a GitHub repository for this script.")
+        .switch();
+    construct!(Interface {
+        script_name,
+        cli,
+        gh
+    })
+    .to_options()
+    .descr("Set up a project for a Rust shell script/program.")
+}
 
-const NAME_FROM_INTERFACE: &str = r#"let args = Interface::parse();
-let name = args.name;"#;
-
-const DEFAULT_NAME: &str = r#"let name = "world";"#;
-
-const MAIN_RS: fn(bool) -> String = |cli: bool| {
-    format!(
-        r#"{}use xshell::{{cmd, Shell}};
-fn main() -> anyhow::Result<()> {{
-    {}
-    let sh = Shell::new()?;
-    cmd!(sh, "echo \"hello {{name}}!\"").run()?;
-    Ok(())
-}}
-"#,
-        if cli { CLI } else { "" },
-        if cli {
-            NAME_FROM_INTERFACE
-        } else {
-            DEFAULT_NAME
-        }
-    )
-};
-
-// Double brackets in the body of this functions's format string in order to
-// escape them and print them as usual.
-const DEFAULT_NIX: fn(&str) -> String = |script_name: &str| {
-    format!(
-        r#"{{ lib, rustPlatform }}:
-rustPlatform.buildRustPackage rec {{
-  pname = "{script_name}";
-  version = "0.1.0";
-
-  src = ./.;
-
-  cargoLock = {{ lockFile = ./Cargo.lock; }};
-
-  buildType = "release";
-
-  meta = with lib; {{
-    description = "Helper for creating a new Rust scripting project";
-    homepage = "https://github.com/bzm3r/{script_name}";
-    license = with licenses; [ asl20 mit ];
-    maintainers = with maintainers; [ ];
-    mainProgram = "{script_name}";
-  }};
-}}
-"#
-    )
-};
-
-const TEST_BUILD_NIX: &str = r#"# run with `nix-build test_build.nix`
-let
-  pkgs = import <nixpkgs> {};
-in
-pkgs.callPackage (import ./default.nix) {}
-"#;
+struct Templates {
+    cli_main_rs: &'static str,
+    shell_main_rs: &'static str,
+    default_nix: fn(&str) -> String,
+    test_build_nix: &'static str,
+}
 
 fn main() -> anyhow::Result<()> {
-    let args = Interface::parse();
-    let name = args.name;
+    let opts = opts().run();
+    let script_name = opts.script_name;
+
+    let templates =     Templates {
+        cli_main_rs: include_str!("template_cli.rs"),
+        shell_main_rs: include_str!("template_shell.rs"),
+        default_nix: |script_name| include_str!("../default.nix").replace("TEMPLATE_PLACEHOLDER", script_name),
+        test_build_nix: include_str!("../test_build.nix"),
+    };
 
     let sh = Shell::new()?;
     // TODO: if project already exists, ask if it should be deleted?
-    cmd!(sh, "cargo init {name}").run()?;
-    sh.change_dir(&name);
-    if args.cli {
-        cmd!(sh, "cargo add clap --features derive").run()?;
+    cmd!(sh, "cargo init {script_name}").run()?;
+    sh.change_dir(&script_name);
+    if opts.cli {
+        cmd!(
+            sh,
+            "cargo add bpaf --features autocomplete,docgen,bright-color"
+        )
+        .run()?;
     };
     cmd!(sh, "cargo add xshell anyhow").run()?;
     sh.remove_path("./src/main.rs")?;
-    sh.write_file("./src/main.rs", MAIN_RS(args.cli))?;
-    sh.write_file("./default.nix", DEFAULT_NIX(&name))?;
-    sh.write_file("./test_build.nix", TEST_BUILD_NIX)?;
+    sh.write_file("./src/main.rs", if opts.cli {
+        templates.cli_main_rs
+    } else {
+        templates.shell_main_rs
+    })?;
+    sh.write_file("./default.nix", (templates.default_nix)(&script_name))?;
+    sh.write_file("./test_build.nix", templates.test_build_nix)?;
     cmd!(sh, "rustfmt ./src/main.rs").run()?;
 
-    let interact_with_reuse = format!("Apache-2.0\nMIT\n\n{name}\nhttps://github.com/bzm3r/{name}\nBrian Merchant\nbzm3r@proton.me\n");
+    let interact_with_reuse = format!("Apache-2.0\nMIT\n\n{script_name}\nhttps://github.com/bzm3r/{script_name}\nBrian Merchant\nbzm3r@proton.me\n");
     cmd!(sh, "reuse init").stdin(&interact_with_reuse).run()?;
 
     cmd!(sh, "git init").run()?;
@@ -112,9 +82,13 @@ fn main() -> anyhow::Result<()> {
     cmd!(sh, "git add .").run()?;
     cmd!(sh, "git commit -m \"init\"").run()?;
 
-    if args.gh {
+    if opts.gh {
         let cwd = sh.current_dir();
-        cmd!(sh, "gh repo create {name} --public --push --source={cwd}").run()?;
+        cmd!(
+            sh,
+            "gh repo create {script_name} --public --push --source={cwd}"
+        )
+        .run()?;
     };
 
     Ok(())

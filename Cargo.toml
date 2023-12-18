@@ -2,10 +2,25 @@
 name = "mkscript"
 version = "0.1.0"
 edition = "2021"
+default-run = "mkscript"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# See more keys and their definitions at
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "mkscript"
+path = "src/main.rs"
+
+[[bin]]
+name = "template-shell"
+path = "src/template_shell.rs"
+
+[[bin]]
+name = "template-cli"
+path = "src/template_cli.rs"
 
 [dependencies]
 anyhow = "1.0.75"
-clap = { version = "4.4.11", features = ["derive"] }
+autocomplete = "0.1.3"
+bpaf = { version = "0.9.8", features = ["bright-color", "autocomplete"] }
 xshell = "0.2.5"
