@@ -6,6 +6,7 @@ rustPlatform.buildRustPackage {
   src = ./.;
 
   cargoLock = { lockFile = ./Cargo.lock; };
+  cargoBuildFlags = [ "--bin" "mkscript" ];
 
   buildType = "release";
 

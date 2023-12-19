@@ -1,37 +1,27 @@
-use bpaf::{self, construct, positional, OptionParser, Parser, short};
+use bpaf::{Parser, Bpaf};
 use xshell::{cmd, Shell};
 
-#[derive(Debug, Clone)]
-struct Interface {
-    /// Example of a positional argument.
-    pos: String,
+// bpaf docs: https://docs.rs/bpaf/latest/bpaf/index.html
+// xshell docs: https://docs.rs/xshell/latest/xshell/index.html
 
+/// Template Rust CLI script.
+#[derive(Bpaf, Debug, Clone)]
+struct Template {
     /// Example of an optional flag.
+    #[bpaf(short, long)]
     opt: bool,
 
     /// Example of an optional argument.
+    #[bpaf(argument("OPTIONAL_ARG"), short, long)]
     arg: Option<usize>,
-}
 
-fn opts() -> OptionParser<Interface> {
-    let pos = positional("POSITIONAL").help("Example of a positional argument.");
-    let opt = short('o').long("opt")
-        .help("Example of an optional flag..")
-        .switch();
-    let arg = short('a').long("arg")
-        .help("Example of an optional argument.")
-        .argument("OPTIONAL_ARG").optional();
-    construct!(Interface {
-        pos,
-        opt,
-        arg
-    })
-    .to_options()
-    .descr("Template Rust CLI script.")
+    /// Example of a positional argument.
+    #[bpaf(positional("POSITIONAL"))]
+    pos: String,
 }
 
 fn main() -> anyhow::Result<()> {
-    let opts = opts().run();
+    let opts = template().run();
     let greeting = if opts.opt { "goodbye" } else { "hello" };
     let thing = opts.pos.repeat(opts.arg.unwrap_or(1));
     let message = format!("{greeting} {thing}!");
