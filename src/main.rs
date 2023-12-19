@@ -1,36 +1,23 @@
-use bpaf::{self, construct, long, positional, OptionParser, Parser};
+use bpaf::{self, Parser, Bpaf};
 use xshell::{cmd, Shell};
 
-#[derive(Debug, Clone)]
-struct Interface {
-    /// New script's name.
-    script_name: String,
-
+/// Initialize a template Rust project for a shell script or CLI tool.
+#[derive(Bpaf, Debug, Clone)]
+struct MkScript {
     /// Whether the project requires CLI functionality (if so, `clap` will be
     /// added to its Cargo.toml).
+    #[bpaf(short, long)]
     cli: bool,
 
     /// Whether the project should be associated with a Github repo. If a repo
     /// name is provided, the repo will be created under that name. Otherwise,
     /// the script's name will be used as the repo's name.
+    #[bpaf(short, long)]
     gh: bool,
-}
 
-fn opts() -> OptionParser<Interface> {
-    let script_name = positional("SCRIPT_NAME").help("Name of the new script to be created.");
-    let cli = long("cli")
-        .help("Additionally import CLI creation crate (`bpaf`).")
-        .switch();
-    let gh = long("gh")
-        .help("Set up a GitHub repository for this script.")
-        .switch();
-    construct!(Interface {
-        script_name,
-        cli,
-        gh
-    })
-    .to_options()
-    .descr("Set up a project for a Rust shell script/program.")
+    /// New script's name.
+    #[bpaf(positional("SCRIPT_NAME"))]
+    script_name: String,
 }
 
 struct Templates {
@@ -41,7 +28,7 @@ struct Templates {
 }
 
 fn main() -> anyhow::Result<()> {
-    let opts = opts().run();
+    let opts = mk_script().run();
     let script_name = opts.script_name;
 
     let templates =     Templates {
@@ -58,7 +45,7 @@ fn main() -> anyhow::Result<()> {
     if opts.cli {
         cmd!(
             sh,
-            "cargo add bpaf --features autocomplete,docgen,bright-color"
+            "cargo add bpaf --features autocomplete,docgen,bright-color,derive"
         )
         .run()?;
     };
