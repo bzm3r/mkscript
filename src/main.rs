@@ -1,3 +1,5 @@
+use std::{fs::OpenOptions, io::Write};
+
 use bpaf::{self, Bpaf, Parser};
 use xshell::{cmd, Shell};
 
@@ -28,23 +30,22 @@ struct Templates {
     rustfmt_toml: &'static str,
 }
 
+const TEMPLATES: Templates = Templates {
+    cli_main_rs: include_str!("template_cli.rs"),
+    shell_main_rs: include_str!("template_shell.rs"),
+    default_nix: |script_name| {
+        include_str!("../default.nix")
+            .replace("TEMPLATE_PLACEHOLDER", script_name)
+    },
+    test_build_nix: include_str!("../test_build.nix"),
+    rustfmt_toml: include_str!("rustfmt.toml"),
+};
+
 fn main() -> anyhow::Result<()> {
     let opts = mk_script().run();
     let script_name = opts.script_name;
 
-    let templates = Templates {
-        cli_main_rs: include_str!("template_cli.rs"),
-        shell_main_rs: include_str!("template_shell.rs"),
-        default_nix: |script_name| {
-            include_str!("../default.nix")
-                .replace("TEMPLATE_PLACEHOLDER", script_name)
-        },
-        test_build_nix: include_str!("../test_build.nix"),
-        rustfmt_toml: include_str!("rustfmt.toml"),
-    };
-
     let sh = Shell::new()?;
-    // TODO: if project already exists, ask if it should be deleted?
     cmd!(sh, "cargo init {script_name}").run()?;
     sh.change_dir(&script_name);
     if opts.cli {
@@ -59,22 +60,38 @@ fn main() -> anyhow::Result<()> {
     sh.write_file(
         "./src/main.rs",
         if opts.cli {
-            templates.cli_main_rs
+            TEMPLATES.cli_main_rs
         } else {
-            templates.shell_main_rs
+            TEMPLATES.shell_main_rs
         },
     )?;
-    sh.write_file("./default.nix", (templates.default_nix)(&script_name))?;
-    sh.write_file("./test_build.nix", templates.test_build_nix)?;
-    sh.write_file("./rustfmt.toml", templates.rustfmt_toml)?;
+    sh.write_file("./default.nix", (TEMPLATES.default_nix)(&script_name))?;
+    sh.write_file("./test_build.nix", TEMPLATES.test_build_nix)?;
+    sh.write_file("./rustfmt.toml", TEMPLATES.rustfmt_toml)?;
     cmd!(sh, "rustfmt ./src/main.rs").run()?;
 
     let interact_with_reuse = format!("Apache-2.0\nMIT\n\n{script_name}\nhttps://github.com/bzm3r/{script_name}\nBrian Merchant\nbzm3r@proton.me\n");
-    cmd!(sh, "reuse init").stdin(&interact_with_reuse).run()?;
+
+    cmd!(sh, "reuse init")
+        .stdin(&interact_with_reuse)
+        .run()
+        .unwrap_or_else(|err| println!("{err}"));
 
     cmd!(sh, "git init").run()?;
-    let original_contents = sh.read_file(".gitignore")?;
-    sh.write_file(".gitignore", format!("{original_contents}/result\n"))?;
+
+    match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(sh.current_dir().join(".gitignore"))
+    {
+        Ok(mut f) => {
+            f.write_all("/result\n".as_bytes()).unwrap_or_else(|err| {
+                println!("Could not append to .gitignore: {err}")
+            });
+        }
+        Err(err) => println!("Could not modify .gitignore: {err}"),
+    }
     cmd!(sh, "git add .").run()?;
     cmd!(sh, "git commit -m \"init\"").run()?;
 
