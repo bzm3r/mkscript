@@ -34,10 +34,10 @@ const TEMPLATES: Templates = Templates {
     cli_main_rs: include_str!("template_cli.rs"),
     shell_main_rs: include_str!("template_shell.rs"),
     default_nix: |script_name| {
-        include_str!("../default.nix")
+        include_str!("./default.nix")
             .replace("TEMPLATE_PLACEHOLDER", script_name)
     },
-    test_build_nix: include_str!("../test_build.nix"),
+    test_build_nix: include_str!("./test_build.nix"),
     rustfmt_toml: include_str!("rustfmt.toml"),
 };
 
